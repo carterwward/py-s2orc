@@ -1,7 +1,5 @@
 import requests
 import os
-import json
-import argparse
 from dotenv import load_dotenv
 from tqdm import tqdm
 
@@ -24,7 +22,7 @@ class PyS2orc:
     PAPER_ID = "paperId"
     DATA_FIELD = "data"
 
-    def __init__(self) -> None:
+    def __init__(self) -> None: # TODO: add API keys and stuff as optional args.
         load_dotenv()
         self.s2_api_key = os.getenv("S2_API_KEY")
 
@@ -102,7 +100,7 @@ class PyS2orc:
         results_per_year = round(kwargs["sample_size"] / num_years)
         for i, (start_year, end_year) in enumerate(year_pairs):
             print(f"Requesting {start_year} - {end_year}...")
-            # TODO: Debug error happening at 55% for 2016 to 2017.
+            # TODO: Debug error happening at 88% for 2017 to 2018.
             sample_size = results_per_year*(i+1)
             self.paginate_by_batch(
                 endpoint=self.SEARCH_ENDPOINT,
@@ -129,26 +127,3 @@ class PyS2orc:
                     "year": f"{kwargs['start_year']}-{kwargs['end_year']}"
                 },
             ).json()
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="This script retrieves the sentence embeddings from S2orc API using\
-        some topic query. The script requires the number of papers to be retrieved\
-        and the topic query."
-    )
-    parser.add_argument("query")
-    parser.add_argument("sample_size")
-    parser.add_argument("start_year")
-    parser.add_argument("end_year")
-    args = parser.parse_args()
-    s2orc = PyS2orc()
-    search_dict = s2orc.paper_embeddings_search(args.query, int(args.sample_size),
-                                                int(args.start_year),
-                                                int(args.end_year))
-    with open(f"data/{args.query}_{args.sample_size}.json", "w") as f:
-        json.dump(search_dict, f, indent=4)
-
-
-if __name__ == "__main__":
-    main()
