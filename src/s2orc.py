@@ -1,18 +1,16 @@
 import requests
 import os
 from dotenv import load_dotenv
+from time import sleep
 from tqdm import tqdm
 
 
 def unpack_merge_request_results(
     results_dict: dict, request_json: dict, id_field: str, data_field: str
 ) -> int:
-    # TODO: Check for code 429, returning none and letting the program know to pause
-    # and retry.
     if data_field not in request_json:
-        # TODO: Raise exception
-        print(request_json)
-        os._exit(1)
+        raise Exception(f"{data_field} not found in the response json:\n{request_json}")
+
     new_results = {
         data_dict[id_field]: data_dict for data_dict in request_json[data_field]
     }
@@ -22,11 +20,12 @@ def unpack_merge_request_results(
 
 class PyS2orc:
     SEARCH_ENDPOINT = "https://api.semanticscholar.org/graph/v1/paper/search"
-    EMBEDDING_REQUEST_FIELDS = "title,authors,year,journal"
+    EMBEDDING_REQUEST_FIELDS = "title,authors,year,journal,embedding"
     BATCH_LIMIT = 100
     PAGINATED_LIMIT = 10000
     PAPER_ID = "paperId"
     DATA_FIELD = "data"
+    SLEEP_TIME = 1.5
 
     def __init__(self) -> None: # TODO: add API keys and stuff as optional args.
         load_dotenv()
@@ -125,8 +124,8 @@ class PyS2orc:
                 end_year=end_year
             )
 
-    def request_s2orc_api(self, **kwargs):
-        req = requests.get(
+    def send_request(self, **kwargs):
+        return requests.get(
                 kwargs["endpoint"],
                 headers={"X-API-KEY": self.s2_api_key},
                 params={
@@ -136,5 +135,11 @@ class PyS2orc:
                     "fields": kwargs["fields"],
                     "year": f"{kwargs['start_year']}-{kwargs['end_year']}"
                 },
-            )
-        return req.json()
+            ).json()
+
+    def request_s2orc_api(self, **kwargs):
+        request_json = self.send_request(**kwargs)
+        if "code" in request_json and request_json["code"] == "429":
+            sleep(self.SLEEP_TIME)
+            request_json = self.request_s2orc_api(**kwargs)
+        return request_json
