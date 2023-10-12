@@ -7,6 +7,12 @@ from tqdm import tqdm
 def unpack_merge_request_results(
     results_dict: dict, request_json: dict, id_field: str, data_field: str
 ) -> int:
+    # TODO: Check for code 429, returning none and letting the program know to pause
+    # and retry.
+    if data_field not in request_json:
+        # TODO: Raise exception
+        print(request_json)
+        os._exit(1)
     new_results = {
         data_dict[id_field]: data_dict for data_dict in request_json[data_field]
     }
@@ -71,10 +77,16 @@ class PyS2orc:
         return results_dict
 
     def paginate_by_batch(self, **kwargs):
+        # Check if results dict is not empty.
+        size_limit = kwargs["sample_size"]
+        if len(kwargs["results"]) > 0:
+            # Adjust the sample size accordingly.
+            size_limit += len(kwargs["results"])
+
         offset = 0
         pbar = tqdm(total=kwargs["sample_size"])
         pbar.set_description("Request Progress")
-        while len(kwargs["results"]) < kwargs["sample_size"]:
+        while len(kwargs["results"]) < size_limit:
             query_results = self.request_s2orc_api(
                 endpoint=kwargs["endpoint"],
                 query=kwargs["query"],
@@ -82,7 +94,7 @@ class PyS2orc:
                 offset=offset,
                 fields=kwargs["fields"],
                 start_year=kwargs["start_year"],
-                end_year=["end_year"]
+                end_year=kwargs["end_year"]
             )
             number_new_results = unpack_merge_request_results(
                 kwargs["results"], query_results,
@@ -90,22 +102,21 @@ class PyS2orc:
             )
             pbar.update(number_new_results)
             offset += number_new_results
+
         pbar.close()
         print("Request Complete.")
 
     def paginate_by_year(self, **kwargs):
         years = range(kwargs["start_year"], kwargs["end_year"], 1)
         num_years = len(years)
-        year_pairs = [(years[i], years[i+1]) for i in range(num_years-1)]
-        results_per_year = round(kwargs["sample_size"] / num_years)
+        year_pairs = [(years[i], years[i+1]) for i in range(0, num_years-1, 2)]
+        results_per_year = round(kwargs["sample_size"] / len(year_pairs))
         for i, (start_year, end_year) in enumerate(year_pairs):
             print(f"Requesting {start_year} - {end_year}...")
-            # TODO: Debug error happening at 88% for 2017 to 2018.
-            sample_size = results_per_year*(i+1)
             self.paginate_by_batch(
                 endpoint=self.SEARCH_ENDPOINT,
                 query=kwargs["query"],
-                sample_size=sample_size,
+                sample_size=results_per_year,
                 fields=kwargs["fields"],
                 results=kwargs["results"],
                 id_field=kwargs["id_field"],
@@ -113,10 +124,9 @@ class PyS2orc:
                 start_year=start_year,
                 end_year=end_year
             )
-        print(len(kwargs["results"]))
 
     def request_s2orc_api(self, **kwargs):
-        return requests.get(
+        req = requests.get(
                 kwargs["endpoint"],
                 headers={"X-API-KEY": self.s2_api_key},
                 params={
@@ -126,4 +136,5 @@ class PyS2orc:
                     "fields": kwargs["fields"],
                     "year": f"{kwargs['start_year']}-{kwargs['end_year']}"
                 },
-            ).json()
+            )
+        return req.json()
