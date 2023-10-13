@@ -20,7 +20,7 @@ def unpack_merge_request_results(
 
 class PyS2orc:
     SEARCH_ENDPOINT = "https://api.semanticscholar.org/graph/v1/paper/search"
-    EMBEDDING_REQUEST_FIELDS = "title,authors,year,journal,embedding"
+    EMBEDDING_REQUEST_FIELDS = "title,authors,tldr,year,journal,embedding"
     BATCH_LIMIT = 100
     PAGINATED_LIMIT = 10000
     PAPER_ID = "paperId"
